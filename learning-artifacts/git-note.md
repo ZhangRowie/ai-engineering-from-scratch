@@ -27,6 +27,19 @@
 
 之前的提交不会因为我再次编辑文件而自动改变。如果 `git add` 后又修改了文件，需要再次 `git add`，才能把后来的修改也放进下一次提交。
 
+#### 为什么要分成 git add 和 git commit
+
+| 操作 | 类比：整理一份学习档案 |
+|---|---|
+| 编辑并保存文件 | 写好材料 |
+| git add | 选好这次要归档的材料 |
+| git commit | 正式归档，生成一个可查阅的版本 |
+| git push | 把已归档的版本上传到 GitHub |
+
+为什么要分成两步？ 因为你可能同时修改了多个文件，但这次只想提交其中一部分。add 让你决定哪些修改属于这次提交。
+
+还有一个重要细节：add 之后再改文件，后面的修改不会自动进入暂存区。 如果也想把后面的修改提交进去，就需要再次执行 git add。
+
 ## 2. 配置提交者身份：git config
 
 下面是配置语法，姓名和邮箱需要替换成自己的信息；已经配置好就不用重复执行。
@@ -106,7 +119,6 @@ git add git-note.md
 
 路径相对于终端当前所在目录。`git add` 不会替我创建文件。课程中的 `git add file.py` 使用了示例文件名，如果实际不存在这个文件，就会提示 `pathspec 'file.py' did not match any files`。
 
-我的实际笔记名是 `git-note.md`，不是 `git-notes.md`；文件名必须对应。
 
 ### git commit -m：创建本地版本
 
@@ -122,6 +134,16 @@ git commit -m "docs: add first Git learning note"
 课程示例中的 `"Add perceptron implementation"` 意思是“添加感知机的实现”，只是提交说明。它不会替我实现感知机，也不需要照抄。
 
 `git commit` 只记录本地版本，不会上传到 GitHub。
+
+每次git add后不必紧跟 git commit。
+git add 后可以继续工作，等准备好再 git commit，中间没有时间限制。
+比如可以：
+1. 修改笔记，执行 git add。
+2. 再修改 .gitignore，也执行 git add。
+3. 检查准备提交的内容：
+   git diff --staged
+4. 确认这些修改适合放在同一个版本里，再执行：
+   git commit -m "docs: update learning notes and ignore rules"
 
 ## 5. 查看差异与提交历史
 
@@ -285,7 +307,80 @@ Fast-forward
 
 合并不会自动删除 `my-progress`，也不会自动上传。合并完成后再用 `git push -u origin main`，才会更新自己 GitHub 仓库的 `main`。
 
-## 9. 顺便学到的 Shell 语法
+### 关于merge和push的顺序关系
+
+merge 使用本地已有的提交，不需要先 push，也不需要联网。
+
+**方式一：学习过程中持续上传，完成后再合并————多次push、然后一次性merge**
+
+在 my-progress 上多次修改、add、commit、push。完成后：
+
+git checkout main
+git merge my-progress
+git push origin main
+
+合并会把 my-progress 中尚未纳入 main 的已提交成果整合进来。之前的各次提交记录仍然保留，不会被压缩成一次提交。
+
+**方式二：离线完成本地工作，联网后再上传————本地多次merge，然后一次性push**
+
+在 my-progress 上修改、add、commit，然后离线执行：
+
+git checkout main
+git merge my-progress
+
+联网后再执行：
+
+git push origin main
+
+这样就能把合并后的成果上传到远程 main，即使你从未单独上传过 my-progress 也可以。
+
+关键是：先把准备合并的修改 commit 成本地提交；至于什么时候 push，可以根据需要安排。
+
+
+## 9. gitignore 和 git chech-ignore
+.gitignore：告诉 Git 哪些文件不需要纳入版本管理.
+例如，模型文件可能很大，通常不随代码提交:
+*.pt
+*.pth
+*.safetensors
+
+这里的 * 表示匹配任意文件名，所以 *.pt 会匹配 model.pt、test.pt 等文件。
+
+```bash
+git check-ignore -v learning-artifacts/demo-model.pt（文件名）
+```
+这条命令显示匹配的忽略规则，类似：
+```txt
+.gitignore:51:*.pt    learning-artifacts/demo-model.pt
+```
+
+意思是：项目 .gitignore 第 51 行的 *.pt 规则忽略了这个文件。
+但是忽略不等于删除。 文件仍然在电脑上，只是 Git 默认不把它作为待添加的新文件。另一个关键点是：.gitignore 主要作用于尚未跟踪的文件，不能让已经提交过的文件自动退出版本管理。
+
+存在两种情况：
+
+| 情况 | 添加忽略规则后的结果 |
+|---|---|
+| 文件还没有被 Git 跟踪 | Git 默认忽略它，不再显示为待添加的新文件 |
+| 文件已经被 Git 跟踪 | Git 继续记录它的变化，忽略规则不会使它退出跟踪 |
+
+比如，假设你曾经把 model.pt 添加并提交了：
+
+1. Git 已经开始跟踪 model.pt。
+2. 你后来在 .gitignore 中加入 *.pt。
+3. 再修改 model.pt，git status 仍然会显示它被修改了。
+
+如果确实想停止跟踪它，同时保留电脑上的文件，可以使用下面的命令。这里只是说明用法，你刚创建的练习文件已经被忽略，不需要执行：
+
+```bash
+git rm --cached model.pt
+```
+
+其中 `--cached` 表示从 Git 的暂存区中移除，保留工作区里的文件。再提交这次变更，并保留 .gitignore 规则，之后 Git 就不会继续跟踪这个文件了。
+
+不过，历史提交里已有的文件仍然存在，这不会抹掉过去的版本。
+
+## 10. 顺便学到的 Shell 语法
 
 这些是终端 Shell 的功能，不属于 Git。
 
@@ -306,7 +401,7 @@ echo '- 修改文件并保存，不会自动更新之前的提交；需要再次
 
 如果把 `>>` 写成 `>`，就会覆盖原笔记。执行前也要核对文件名和所在目录。
 
-## 10. 以后复习时的操作顺序
+## 11. 以后复习时的操作顺序
 
 下面是一轮练习的参考流程。执行前先确认分支和文件状态，不需要为了复习重复创建已存在的分支或远程配置。以下路径以项目根目录为基准。
 
